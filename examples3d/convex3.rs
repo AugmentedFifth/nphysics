@@ -8,9 +8,11 @@ use rand::{Rand, XorShiftRng};
 
 use na::{Isometry3, Point3, Vector3};
 use ncollide3d::shape::{Ball, ConvexHull, Cuboid, ShapeHandle};
-use nphysics3d::object::{BodyHandle, Material};
-use nphysics3d::volumetric::Volumetric;
-use nphysics3d::world::World;
+use nphysics3d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed3d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -19,15 +21,20 @@ fn main() {
     /*
      * World
      */
+    #[cfg(not(target_arch = "wasm32"))]
     let mut world = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world = World::new(|| 0.0);
+
     world.set_gravity(Vector3::new(0.0, -9.81, 0.0));
 
     /*
      * Ground
      */
     let ground_size = 50.0;
-    let ground_shape =
-        ShapeHandle::new(Cuboid::new(Vector3::repeat(ground_size - COLLIDER_MARGIN)));
+    let ground_shape = ShapeHandle::new(Cuboid::new(Vector3::repeat(
+        ground_size - COLLIDER_MARGIN,
+    )));
     let ground_pos = Isometry3::new(Vector3::y() * -ground_size, na::zero());
 
     world.add_collider(
@@ -66,7 +73,9 @@ fn main() {
                         pts.push(Point3::rand(&mut rng) * 0.4);
                     }
 
-                    geom = ShapeHandle::new(ConvexHull::try_from_points(&pts).unwrap());
+                    geom = ShapeHandle::new(
+                        ConvexHull::try_from_points(&pts).unwrap(),
+                    );
                 } else {
                     geom = ShapeHandle::new(Ball::new(0.1 - COLLIDER_MARGIN));
                 }
@@ -75,7 +84,8 @@ fn main() {
                 let center_of_mass = geom.center_of_mass();
 
                 let pos = Isometry3::new(Vector3::new(x, y, z), na::zero());
-                let handle = world.add_rigid_body(pos, inertia, center_of_mass);
+                let handle =
+                    world.add_rigid_body(pos, inertia, center_of_mass);
 
                 /*
                  * Create the collider.

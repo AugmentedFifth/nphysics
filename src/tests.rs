@@ -16,7 +16,7 @@ mod test {
     #[test]
     fn gravity2() {
         // world
-        let mut world = World::new();
+        #[cfg(not(target_arch = "wasm32"))]     let mut world = World::new();     #[cfg(target_arch = "wasm32")]     let mut world = World::new(|| 0.0);
 
         // rigidbody with side length 2, area 4 and mass 4
         let geom   = Cuboid::new(Vector2::new(1.0, 1.0));
@@ -122,7 +122,7 @@ mod test {
     #[test]
     fn forces2() {
         // world
-        let mut world = World::new();
+        #[cfg(not(target_arch = "wasm32"))]     let mut world = World::new();     #[cfg(target_arch = "wasm32")]     let mut world = World::new(|| 0.0);
 
         // rigidbody with side length 2, area 4 and mass 4
         let geom   = Cuboid::new(Vector2::new(1.0, 1.0));
@@ -376,7 +376,7 @@ mod test {
     #[test]
     fn impulse2() {
         // world
-        let mut world = World::new();
+        #[cfg(not(target_arch = "wasm32"))]     let mut world = World::new();     #[cfg(target_arch = "wasm32")]     let mut world = World::new(|| 0.0);
 
         // rigidbody with side length 2, area 4 and mass 4
         let geom = Cuboid::new(Vector2::new(1.0, 1.0));

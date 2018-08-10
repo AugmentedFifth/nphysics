@@ -13,11 +13,22 @@ pub struct CollisionDetectionCounters {
 
 impl CollisionDetectionCounters {
     /// Creates a new counter initialized to zero.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         CollisionDetectionCounters {
-            ncontact_pairs: 0,
-            broad_phase_time: Timer::new(),
+            ncontact_pairs:    0,
+            broad_phase_time:  Timer::new(),
             narrow_phase_time: Timer::new(),
+        }
+    }
+
+    /// Creates a new counter initialized to zero.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(time_in_sec: fn() -> f64) -> Self {
+        CollisionDetectionCounters {
+            ncontact_pairs:    0,
+            broad_phase_time:  Timer::new(time_in_sec),
+            narrow_phase_time: Timer::new(time_in_sec),
         }
     }
 }

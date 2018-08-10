@@ -5,11 +5,13 @@ extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Point2, Vector2};
 use ncollide2d::shape::{Ball, Cuboid, ShapeHandle};
-use nphysics2d::joint::RevoluteJoint;
-use nphysics2d::math::{Inertia, Velocity};
-use nphysics2d::object::{BodyHandle, BodyStatus, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use nphysics2d::{
+    joint::RevoluteJoint,
+    math::{Inertia, Velocity},
+    object::{BodyHandle, BodyStatus, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -18,7 +20,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -85,7 +91,8 @@ fn main() {
     let centerx = shift * (num as f32) / 2.0;
     let centery = shift / 2.0 + 3.04;
 
-    let geom = ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
+    let geom =
+        ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
     let inertia = geom.inertia(1.0);
     let center_of_mass = geom.center_of_mass();
 
@@ -118,7 +125,8 @@ fn main() {
      */
     let geom = ShapeHandle::new(Cuboid::new(Vector2::new(rad * 10.0, rad)));
     let pos = Isometry2::new(Vector2::new(0.0, 1.5), na::zero());
-    let platform_handle = world.add_rigid_body(pos, Inertia::zero(), Point2::origin());
+    let platform_handle =
+        world.add_rigid_body(pos, Inertia::zero(), Point2::origin());
     {
         let rb = world.rigid_body_mut(platform_handle).unwrap();
         rb.set_status(BodyStatus::Kinematic);
@@ -139,7 +147,8 @@ fn main() {
     // let joint     = RevoluteJoint::new(0.0);
     // let inertia   = Inertia::zero();
     // let joint_pos = Isometry2::new(Vector2::new(5.0, -2.0), na::zero());
-    // let handle    = world.add_multibody_link(BodyHandle::ground(), joint, Vector2::new(2.0, 0.0), joint_pos, inertia);
+    // let handle    = world.add_multibody_link(BodyHandle::ground(), joint,
+    // Vector2::new(2.0, 0.0), joint_pos, inertia);
 
     // {
     //     let mut mb = world.multibody_mut(handle).unwrap();
@@ -147,7 +156,8 @@ fn main() {
     //     mb.set_status(BodyStatus::Kinematic);
     // }
 
-    // world.add_collider(COLLIDER_MARGIN, geom, handle, Isometry2::identity(), true);
+    // world.add_collider(COLLIDER_MARGIN, geom, handle,
+    // Isometry2::identity(), true);
 
     /*
      * Setup a motorized multibody.

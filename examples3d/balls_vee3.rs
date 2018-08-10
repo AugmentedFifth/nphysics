@@ -5,9 +5,11 @@ extern crate nphysics_testbed3d;
 
 use na::{Isometry3, Point3, Unit, Vector3};
 use ncollide3d::shape::{Ball, Plane, ShapeHandle};
-use nphysics3d::volumetric::Volumetric;
-use nphysics3d::world::World;
-use nphysics3d::object::{BodyHandle, Material};
+use nphysics3d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed3d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -16,7 +18,10 @@ fn main() {
     /*
      * World
      */
+    #[cfg(not(target_arch = "wasm32"))]
     let mut world = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world = World::new(|| 0.0);
     world.set_gravity(Vector3::new(0.0, -9.81, 0.0));
 
     // Material.
@@ -68,7 +73,8 @@ fn main() {
                  * Create the rigid body.
                  */
                 let pos = Isometry3::new(Vector3::new(x, y, z), na::zero());
-                let handle = world.add_rigid_body(pos, inertia, center_of_mass);
+                let handle =
+                    world.add_rigid_body(pos, inertia, center_of_mass);
 
                 /*
                  * Create the collider.

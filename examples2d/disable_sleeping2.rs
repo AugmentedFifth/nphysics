@@ -5,9 +5,7 @@ extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Vector2};
 use ncollide2d::shape::{Cuboid, ShapeHandle};
-use nphysics2d::object::Material;
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use nphysics2d::{object::Material, volumetric::Volumetric, world::World};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -16,7 +14,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, 0.0));
 
     /*
@@ -30,7 +32,8 @@ fn main() {
     /*
      * Create the body that will be deactivated.
      */
-    let body1 = world.add_rigid_body(Isometry2::identity(), inertia, center_of_mass);
+    let body1 =
+        world.add_rigid_body(Isometry2::identity(), inertia, center_of_mass);
     world
         .rigid_body_mut(body1)
         .unwrap()

@@ -6,9 +6,11 @@ extern crate rand;
 
 use na::{Isometry3, Point3, Vector3};
 use ncollide3d::shape::{Cuboid, ShapeHandle, TriMesh};
-use nphysics3d::object::{BodyHandle, Material};
-use nphysics3d::volumetric::Volumetric;
-use nphysics3d::world::World;
+use nphysics3d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed3d::Testbed;
 use rand::{Rng, SeedableRng, StdRng};
 
@@ -18,7 +20,11 @@ fn main() {
     /*
      * World
      */
+    #[cfg(not(target_arch = "wasm32"))]
     let mut world = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world = World::new(|| 0.0);
+
     world.set_gravity(Vector3::new(0.0, -9.81, 0.0));
 
     /*
@@ -33,7 +39,7 @@ fn main() {
     let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let mut vertices = quad.coords;
 
-    // ncollide generatse a quad with `z` as the normal.
+    // ncollide generates a quad with `z` as the normal.
     // so we switch z and y here and set a random altitude at each point.
     for p in &mut vertices {
         p.z = p.y;
@@ -60,7 +66,8 @@ fn main() {
     let centerz = shift * (num as f32) / 2.0;
     let height = 1.0;
 
-    let geom = ShapeHandle::new(Cuboid::new(Vector3::repeat(rad - COLLIDER_MARGIN)));
+    let geom =
+        ShapeHandle::new(Cuboid::new(Vector3::repeat(rad - COLLIDER_MARGIN)));
     let inertia = geom.inertia(1.0);
     let center_of_mass = geom.center_of_mass();
 
@@ -75,7 +82,8 @@ fn main() {
                  * Create the rigid body.
                  */
                 let pos = Isometry3::new(Vector3::new(x, y, z), na::zero());
-                let handle = world.add_rigid_body(pos, inertia, center_of_mass);
+                let handle =
+                    world.add_rigid_body(pos, inertia, center_of_mass);
 
                 /*
                  * Create the collider.

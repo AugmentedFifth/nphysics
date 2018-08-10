@@ -4,11 +4,15 @@ extern crate nphysics2d;
 extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Point2, Point3, Vector2};
-use ncollide2d::query::Proximity;
-use ncollide2d::shape::{Ball, Cuboid, ShapeHandle};
-use nphysics2d::object::{BodyHandle, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use ncollide2d::{
+    query::Proximity,
+    shape::{Ball, Cuboid, ShapeHandle},
+};
+use nphysics2d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -19,7 +23,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -43,7 +51,8 @@ fn main() {
     let shift = rad * 2.0;
     let centerx = shift * (num as f32) / 2.0;
 
-    let geom = ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
+    let geom =
+        ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
     let inertia = geom.inertia(1.0);
     let center_of_mass = geom.center_of_mass();
 
@@ -90,7 +99,8 @@ fn main() {
     testbed.add_callback(move |world, graphics, _| {
         for prox in world.proximity_events() {
             let color = match prox.new_status {
-                Proximity::WithinMargin | Proximity::Intersecting => Point3::new(1.0, 1.0, 0.0),
+                Proximity::WithinMargin | Proximity::Intersecting =>
+                    Point3::new(1.0, 1.0, 0.0),
                 Proximity::Disjoint => Point3::new(0.5, 0.5, 1.0),
             };
 

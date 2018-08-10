@@ -5,9 +5,11 @@ extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Vector2};
 use ncollide2d::shape::{Cuboid, ShapeHandle};
-use nphysics2d::object::{BodyHandle, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use nphysics2d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -16,7 +18,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -46,7 +52,8 @@ fn main() {
     let shift = 2.0 * rad;
     let centerx = shift * (num as f32) / 2.0;
 
-    let geom = ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
+    let geom =
+        ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
     let inertia = geom.inertia(1.0);
     let center_of_mass = geom.center_of_mass();
 

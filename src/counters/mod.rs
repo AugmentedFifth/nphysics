@@ -2,10 +2,12 @@
 
 use std::fmt::{Display, Formatter, Result};
 
-pub use self::collision_detection_counters::CollisionDetectionCounters;
-pub use self::solver_counters::SolverCounters;
-pub use self::stages_counters::StagesCounters;
-pub use self::timer::Timer;
+pub use self::{
+    collision_detection_counters::CollisionDetectionCounters,
+    solver_counters::SolverCounters,
+    stages_counters::StagesCounters,
+    timer::Timer,
+};
 
 mod collision_detection_counters;
 mod solver_counters;
@@ -14,16 +16,17 @@ mod timer;
 
 /// Aggregation of all the performances counters tracked by nphysics.
 pub struct Counters {
-    enabled: bool,
+    enabled:   bool,
     step_time: Timer,
-    custom: Timer,
-    stages: StagesCounters,
-    cd: CollisionDetectionCounters,
-    solver: SolverCounters,
+    custom:    Timer,
+    stages:    StagesCounters,
+    cd:        CollisionDetectionCounters,
+    solver:    SolverCounters,
 }
 
 impl Counters {
-    /// Create a new set of counters initialized to wero.
+    /// Create a new set of counters initialized to zero.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(enabled: bool) -> Self {
         Counters {
             enabled,
@@ -32,6 +35,19 @@ impl Counters {
             stages: StagesCounters::new(),
             cd: CollisionDetectionCounters::new(),
             solver: SolverCounters::new(),
+        }
+    }
+
+    /// Create a new set of counters initialized to zero.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(enabled: bool, time_in_sec: fn() -> f64) -> Self {
+        Counters {
+            enabled,
+            step_time: Timer::new(time_in_sec),
+            custom: Timer::new(time_in_sec),
+            stages: StagesCounters::new(time_in_sec),
+            cd: CollisionDetectionCounters::new(time_in_sec),
+            solver: SolverCounters::new(time_in_sec),
         }
     }
 

@@ -21,7 +21,7 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]     let mut world = World::new();     #[cfg(target_arch = "wasm32")]     let mut world = World::new(|| 0.0);
     world.set_gravity(Vector3::new(0.0, -9.81, 0.0));
 
     /*

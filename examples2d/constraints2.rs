@@ -5,10 +5,12 @@ extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Point2, Vector2};
 use ncollide2d::shape::{Cuboid, ShapeHandle};
-use nphysics2d::joint::{CartesianConstraint, PrismaticConstraint, RevoluteConstraint};
-use nphysics2d::object::{BodyHandle, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use nphysics2d::{
+    joint::{CartesianConstraint, PrismaticConstraint, RevoluteConstraint},
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -17,7 +19,10 @@ fn main() {
     /*
      * World
      */
+    #[cfg(not(target_arch = "wasm32"))]
     let mut world = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world = World::new(|| 0.0);
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -54,11 +59,18 @@ fn main() {
         /*
          * Create the rigid body.
          */
-        let pos = Isometry2::new(Vector2::x() * (j + 1) as f32 * rad * 3.0, na::zero());
+        let pos = Isometry2::new(
+            Vector2::x() * (j + 1) as f32 * rad * 3.0,
+            na::zero(),
+        );
         let rb = world.add_rigid_body(pos, inertia, center_of_mass);
 
-        let revolute_constraint =
-            RevoluteConstraint::new(parent, rb, na::origin(), Point2::new(-rad * 3.0, 0.0));
+        let revolute_constraint = RevoluteConstraint::new(
+            parent,
+            rb,
+            na::origin(),
+            Point2::new(-rad * 3.0, 0.0),
+        );
 
         world.add_constraint(revolute_constraint);
 

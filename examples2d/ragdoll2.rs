@@ -5,10 +5,12 @@ extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Point2, Vector2};
 use ncollide2d::shape::{Ball, Cuboid, ShapeHandle};
-use nphysics2d::joint::{FreeJoint, RevoluteJoint};
-use nphysics2d::object::{BodyHandle, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use nphysics2d::{
+    joint::{FreeJoint, RevoluteJoint},
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -17,7 +19,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -72,10 +78,13 @@ fn add_ragdoll(pos: Vector2<f32>, world: &mut World<f32>) {
     let leg_length = 1.4;
     let space = 0.1;
 
-    let body_geom = ShapeHandle::new(Cuboid::new(Vector2::new(body_radx, body_rady)));
+    let body_geom =
+        ShapeHandle::new(Cuboid::new(Vector2::new(body_radx, body_rady)));
     let head_geom = ShapeHandle::new(Ball::new(head_rad));
-    let arm_geom = ShapeHandle::new(Cuboid::new(Vector2::new(member_rad, arm_length)));
-    let leg_geom = ShapeHandle::new(Cuboid::new(Vector2::new(member_rad, leg_length)));
+    let arm_geom =
+        ShapeHandle::new(Cuboid::new(Vector2::new(member_rad, arm_length)));
+    let leg_geom =
+        ShapeHandle::new(Cuboid::new(Vector2::new(member_rad, leg_length)));
 
     let body_inertia = body_geom.inertia(0.3);
     let head_inertia = head_geom.inertia(0.3);

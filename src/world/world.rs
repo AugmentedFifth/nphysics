@@ -2,11 +2,13 @@ use slab::Slab;
 use std::f64;
 
 use na::{self, Real};
-use ncollide;
-use ncollide::broad_phase::BroadPhasePairFilter;
-use ncollide::events::{ContactEvents, ProximityEvents};
-use ncollide::shape::ShapeHandle;
-use ncollide::world::{CollisionGroups, CollisionObjectHandle, GeometricQueryType};
+use ncollide::{
+    self,
+    broad_phase::BroadPhasePairFilter,
+    events::{ContactEvents, ProximityEvents},
+    shape::ShapeHandle,
+    world::{CollisionGroups, CollisionObjectHandle, GeometricQueryType},
+};
 
 use counters::Counters;
 use detection::{ActivationManager, ColliderContactManifold};
@@ -14,40 +16,109 @@ use force_generator::{ForceGenerator, ForceGeneratorHandle};
 use joint::{ConstraintHandle, Joint, JointConstraint};
 use math::{Inertia, Isometry, Point, Vector};
 use object::{
-    Body, BodyHandle, BodyMut, BodyPart, BodyPartMut, BodySet, BodyStatus, Collider, ColliderData,
-    ColliderHandle, Colliders, Material, Multibody, MultibodyLinkMut, MultibodyLinkRef,
-    MultibodyWorkspace, RigidBody, SensorHandle,
+    Body,
+    BodyHandle,
+    BodyMut,
+    BodyPart,
+    BodyPartMut,
+    BodySet,
+    BodyStatus,
+    Collider,
+    ColliderData,
+    ColliderHandle,
+    Colliders,
+    Material,
+    Multibody,
+    MultibodyLinkMut,
+    MultibodyLinkRef,
+    MultibodyWorkspace,
+    RigidBody,
+    SensorHandle,
 };
-use solver::{ContactModel, IntegrationParameters, MoreauJeanSolver, SignoriniCoulombPyramidModel};
+use solver::{
+    ContactModel,
+    IntegrationParameters,
+    MoreauJeanSolver,
+    SignoriniCoulombPyramidModel,
+};
 
 /// Type of the collision world used by nphysics.
-pub type CollisionWorld<N> = ncollide::world::CollisionWorld<N, ColliderData<N>>;
+pub type CollisionWorld<N> =
+    ncollide::world::CollisionWorld<N, ColliderData<N>>;
 
 /// The physics world.
 pub struct World<N: Real> {
-    counters: Counters,
-    bodies: BodySet<N>,
-    active_bodies: Vec<BodyHandle>,
-    colliders_w_parent: Vec<ColliderHandle>, // The set of colliders that have a parent.
-    cworld: CollisionWorld<N>,
-    solver: MoreauJeanSolver<N>,
+    counters:           Counters,
+    bodies:             BodySet<N>,
+    active_bodies:      Vec<BodyHandle>,
+    colliders_w_parent: Vec<ColliderHandle>, /* The set of colliders that
+                                              * have a parent. */
+    cworld:             CollisionWorld<N>,
+    solver:             MoreauJeanSolver<N>,
     activation_manager: ActivationManager<N>,
     // FIXME: set those two parameters per-collider?
-    prediction: N,
+    prediction:         N,
     angular_prediction: N,
-    gravity: Vector<N>,
-    constraints: Slab<Box<JointConstraint<N>>>,
-    forces: Slab<Box<ForceGenerator<N>>>,
-    params: IntegrationParameters<N>,
-    workspace: MultibodyWorkspace<N>,
+    gravity:            Vector<N>,
+    constraints:        Slab<Box<JointConstraint<N>>>,
+    forces:             Slab<Box<ForceGenerator<N>>>,
+    params:             IntegrationParameters<N>,
+    workspace:          MultibodyWorkspace<N>,
 }
 
 impl<N: Real> World<N> {
     /// Creates a new physics world with default parameters.
     ///
-    /// The ground body is automatically created and added to the world without any colliders attached.
+    /// The ground body is automatically created and added to the world
+    /// without any colliders attached.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         let counters = Counters::new(false);
+        let bv_margin = na::convert(0.01f64);
+        let prediction = na::convert(0.002);
+        let angular_prediction = na::convert(f64::consts::PI / 180.0 * 5.0);
+        let bodies = BodySet::new();
+        let active_bodies = Vec::new();
+        let colliders_w_parent = Vec::new();
+        let constraints = Slab::new();
+        let forces = Slab::new();
+        let mut cworld = CollisionWorld::new(bv_margin);
+        let contact_model = Box::new(SignoriniCoulombPyramidModel::new());
+        let solver = MoreauJeanSolver::new(contact_model);
+        let activation_manager = ActivationManager::new(na::convert(0.01f64));
+        let gravity = Vector::zeros();
+        let params = IntegrationParameters::default();
+        let workspace = MultibodyWorkspace::new();
+        cworld.register_broad_phase_pair_filter(
+            "__nphysics_internal_body_status_collision_filter",
+            BodyStatusCollisionFilter,
+        );
+
+        World {
+            counters,
+            bodies,
+            active_bodies,
+            colliders_w_parent,
+            cworld,
+            solver,
+            activation_manager,
+            prediction,
+            angular_prediction,
+            gravity,
+            constraints,
+            forces,
+            params,
+            workspace,
+        }
+    }
+
+    /// Creates a new physics world with default parameters.
+    ///
+    /// The ground body is automatically created and added to the world
+    /// without any colliders attached.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(time_in_sec: fn() -> f64) -> Self {
+        let counters = Counters::new(false, time_in_sec);
         let bv_margin = na::convert(0.01f64);
         let prediction = na::convert(0.002);
         let angular_prediction = na::convert(f64::consts::PI / 180.0 * 5.0);
@@ -91,17 +162,20 @@ impl<N: Real> World<N> {
         self.prediction
     }
 
-    /// Disable the perfomance counters that measure various times and statistics during a timestep.
+    /// Disable the perfomance counters that measure various times and
+    /// statistics during a timestep.
     pub fn disable_performance_counters(&mut self) {
         self.counters.disable();
     }
 
-    /// Enable the perfomance counters that measure various times and statistics during a timestep.
+    /// Enable the perfomance counters that measure various times and
+    /// statistics during a timestep.
     pub fn enable_performance_counters(&mut self) {
         self.counters.enable();
     }
 
-    /// Retrieve the perfomance counters that measure various times and statistics during a timestep.
+    /// Retrieve the perfomance counters that measure various times and
+    /// statistics during a timestep.
     pub fn performance_counters(&self) -> &Counters {
         &self.counters
     }
@@ -117,7 +191,9 @@ impl<N: Real> World<N> {
     }
 
     /// Retrieve a mutable reference to the parameters for the integration.
-    pub fn integration_parameters_mut(&mut self) -> &mut IntegrationParameters<N> {
+    pub fn integration_parameters_mut(
+        &mut self,
+    ) -> &mut IntegrationParameters<N> {
         &mut self.params
     }
 
@@ -145,7 +221,10 @@ impl<N: Real> World<N> {
     }
 
     /// Add a constraints to the physics world and retrieves its handle.
-    pub fn add_constraint<C: JointConstraint<N>>(&mut self, constraint: C) -> ConstraintHandle {
+    pub fn add_constraint<C: JointConstraint<N>>(
+        &mut self,
+        constraint: C,
+    ) -> ConstraintHandle {
         let (anchor1, anchor2) = constraint.anchors();
         self.activate_body(anchor1);
         self.activate_body(anchor2);
@@ -158,7 +237,10 @@ impl<N: Real> World<N> {
     }
 
     /// Get a mutable reference to the specified constraint.
-    pub fn constraint_mut(&mut self, handle: ConstraintHandle) -> &mut JointConstraint<N> {
+    pub fn constraint_mut(
+        &mut self,
+        handle: ConstraintHandle,
+    ) -> &mut JointConstraint<N> {
         let (anchor1, anchor2) = self.constraints[handle].anchors();
         self.activate_body(anchor1);
         self.activate_body(anchor2);
@@ -166,7 +248,10 @@ impl<N: Real> World<N> {
     }
 
     /// Remove the specified constraint from the world.
-    pub fn remove_constraint(&mut self, handle: ConstraintHandle) -> Box<JointConstraint<N>> {
+    pub fn remove_constraint(
+        &mut self,
+        handle: ConstraintHandle,
+    ) -> Box<JointConstraint<N>> {
         let constraint = self.constraints.remove(handle);
         let (anchor1, anchor2) = constraint.anchors();
         self.activate_body(anchor1);
@@ -191,12 +276,18 @@ impl<N: Real> World<N> {
     }
 
     /// Retrieve a reference to the specified force generator.
-    pub fn force_generator(&self, handle: ForceGeneratorHandle) -> &ForceGenerator<N> {
+    pub fn force_generator(
+        &self,
+        handle: ForceGeneratorHandle,
+    ) -> &ForceGenerator<N> {
         &*self.forces[handle]
     }
 
     /// Retrieve a mutable reference to the specified force generator.
-    pub fn force_generator_mut(&mut self, handle: ForceGeneratorHandle) -> &mut ForceGenerator<N> {
+    pub fn force_generator_mut(
+        &mut self,
+        handle: ForceGeneratorHandle,
+    ) -> &mut ForceGenerator<N> {
         &mut *self.forces[handle]
     }
 
@@ -222,8 +313,8 @@ impl<N: Real> World<N> {
     pub fn step(&mut self) {
         self.counters.step_started();
         self.counters.update_started();
-        // FIXME: objects involeved in a non-linear position stabilization elready
-        // updated their kinematics.
+        // FIXME: objects involeved in a non-linear position stabilization
+        // elready updated their kinematics.
         self.bodies.clear_dynamics();
         self.bodies.update_kinematics();
 
@@ -231,23 +322,27 @@ impl<N: Real> World<N> {
             let _ = gen.1.apply(&self.params, &mut self.bodies);
         }
 
-        self.bodies
-            .update_dynamics(&self.gravity, &self.params, &mut self.workspace);
+        self.bodies.update_dynamics(
+            &self.gravity,
+            &self.params,
+            &mut self.workspace,
+        );
         self.counters.update_completed();
 
         self.counters.collision_detection_started();
         for collider_id in &self.colliders_w_parent {
             let new_pos;
             {
-                // FIXME: update only if the position changed (especially for static bodies).
+                // FIXME: update only if the position changed (especially for
+                // static bodies).
                 let collider = self
                     .cworld
                     .collision_object_mut(*collider_id)
                     .expect("Internal error: collider not found.");
                 let body = self.bodies.body_part(collider.data_mut().body());
-                collider
-                    .data_mut()
-                    .set_body_status_dependent_ndofs(body.status_dependent_parent_ndofs());
+                collider.data_mut().set_body_status_dependent_ndofs(
+                    body.status_dependent_parent_ndofs(),
+                );
 
                 if !body.is_active() {
                     continue;
@@ -292,11 +387,13 @@ impl<N: Real> World<N> {
             let b1 = self.bodies.body(coll1.data().body());
             let b2 = self.bodies.body(coll2.data().body());
 
-            if b1.status() != BodyStatus::Disabled && b2.status() != BodyStatus::Disabled
+            if b1.status() != BodyStatus::Disabled
+                && b2.status() != BodyStatus::Disabled
                 && ((b1.status_dependent_ndofs() != 0 && b1.is_active())
                     || (b2.status_dependent_ndofs() != 0 && b2.is_active()))
             {
-                contact_manifolds.push(ColliderContactManifold::new(coll1, coll2, c));
+                contact_manifolds
+                    .push(ColliderContactManifold::new(coll1, coll2, c));
             }
         }
 
@@ -414,8 +511,11 @@ impl<N: Real> World<N> {
         local_inertia: Inertia<N>,
         local_center_of_mass: Point<N>,
     ) -> BodyHandle {
-        self.bodies
-            .add_rigid_body(position, local_inertia, local_center_of_mass)
+        self.bodies.add_rigid_body(
+            position,
+            local_inertia,
+            local_center_of_mass,
+        )
     }
 
     /// Add a multibody link to the world and retrieve its handle.
@@ -451,7 +551,9 @@ impl<N: Real> World<N> {
             margin + self.prediction * na::convert(0.5f64),
             self.angular_prediction,
         );
-        self.add_collision_object(query, margin, shape, parent, to_parent, material)
+        self.add_collision_object(
+            query, margin, shape, parent, to_parent, material,
+        )
     }
 
     /// Add a sensor to the world and retrieve its handle.
@@ -461,7 +563,9 @@ impl<N: Real> World<N> {
         parent: BodyHandle,
         to_parent: Isometry<N>,
     ) -> SensorHandle {
-        let query = GeometricQueryType::Proximity(self.prediction * na::convert(0.5f64));
+        let query = GeometricQueryType::Proximity(
+            self.prediction * na::convert(0.5f64),
+        );
         self.add_collision_object(
             query,
             N::zero(),
@@ -491,7 +595,8 @@ impl<N: Real> World<N> {
             )
         };
 
-        let data = ColliderData::new(margin, parent, ndofs, to_parent, material);
+        let data =
+            ColliderData::new(margin, parent, ndofs, to_parent, material);
         let groups = CollisionGroups::new();
         let handle = self.cworld.add(pos, shape, groups, query, data);
 
@@ -526,45 +631,65 @@ impl<N: Real> World<N> {
         self.bodies.body_mut(handle)
     }
 
-    /// Get a reference to the multibody containing the specified multibody link.
+    /// Get a reference to the multibody containing the specified multibody
+    /// link.
     ///
-    /// Returns `None` if the handle does not correspond to a multibody link in this world.
+    /// Returns `None` if the handle does not correspond to a multibody link
+    /// in this world.
     pub fn multibody(&self, handle: BodyHandle) -> Option<&Multibody<N>> {
         self.bodies.multibody(handle)
     }
 
-    /// Get a mutable reference to the multibody containing the specified multibody link.
+    /// Get a mutable reference to the multibody containing the specified
+    /// multibody link.
     ///
-    /// Returns `None` if the handle does not correspond to a multibody link in this world.
-    pub fn multibody_mut(&mut self, handle: BodyHandle) -> Option<&mut Multibody<N>> {
+    /// Returns `None` if the handle does not correspond to a multibody link
+    /// in this world.
+    pub fn multibody_mut(
+        &mut self,
+        handle: BodyHandle,
+    ) -> Option<&mut Multibody<N>> {
         self.bodies.multibody_mut(handle)
     }
 
     /// Get a reference to the specified multibody link.
     ///
-    /// Returns `None` if the handle does not correspond to a multibody link in this world.
-    pub fn multibody_link(&self, handle: BodyHandle) -> Option<MultibodyLinkRef<N>> {
+    /// Returns `None` if the handle does not correspond to a multibody link
+    /// in this world.
+    pub fn multibody_link(
+        &self,
+        handle: BodyHandle,
+    ) -> Option<MultibodyLinkRef<N>> {
         self.bodies.multibody_link(handle)
     }
 
     /// Get a mutable reference to the specified multibody link.
     ///
-    /// Returns `None` if the handle does not correspond to a multibody link in this world.
-    pub fn multibody_link_mut(&mut self, handle: BodyHandle) -> Option<MultibodyLinkMut<N>> {
+    /// Returns `None` if the handle does not correspond to a multibody link
+    /// in this world.
+    pub fn multibody_link_mut(
+        &mut self,
+        handle: BodyHandle,
+    ) -> Option<MultibodyLinkMut<N>> {
         self.bodies.multibody_link_mut(handle)
     }
 
     /// Get a reference to the specified rigid body.
     ///
-    /// Returns `None` if the handle does not correspond to a rigid body in this world.
+    /// Returns `None` if the handle does not correspond to a rigid body in
+    /// this world.
     pub fn rigid_body(&self, handle: BodyHandle) -> Option<&RigidBody<N>> {
         self.bodies.rigid_body(handle)
     }
 
     /// Get a mutable reference to the specified rigid body.
     ///
-    /// Returns `None` if the handle does not correspond to a rigid body in this world.
-    pub fn rigid_body_mut(&mut self, handle: BodyHandle) -> Option<&mut RigidBody<N>> {
+    /// Returns `None` if the handle does not correspond to a rigid body in
+    /// this world.
+    pub fn rigid_body_mut(
+        &mut self,
+        handle: BodyHandle,
+    ) -> Option<&mut RigidBody<N>> {
         self.bodies.rigid_body_mut(handle)
     }
 
@@ -572,6 +697,7 @@ impl<N: Real> World<N> {
     pub fn collision_world(&self) -> &CollisionWorld<N> {
         &self.cworld
     }
+
     /// Mutable reference to the underlying collision world.
     pub fn collision_world_mut(&mut self) -> &mut CollisionWorld<N> {
         &mut self.cworld
@@ -579,13 +705,18 @@ impl<N: Real> World<N> {
 
     /// Get a mutable reference to the specified collider.
     ///
-    /// Returns `None` if the handle does not correspond to a collider in this world.
+    /// Returns `None` if the handle does not correspond to a collider in this
+    /// world.
     pub fn collider(&self, handle: ColliderHandle) -> Option<&Collider<N>> {
         self.cworld.collision_object(handle)
     }
 
-    /// Gets the handle of the parent body the specified collider is attached to.
-    pub fn collider_body_handle(&self, handle: ColliderHandle) -> Option<BodyHandle> {
+    /// Gets the handle of the parent body the specified collider is attached
+    /// to.
+    pub fn collider_body_handle(
+        &self,
+        handle: ColliderHandle,
+    ) -> Option<BodyHandle> {
         self.cworld
             .collision_object(handle)
             .map(|co| co.data().body())
@@ -596,17 +727,20 @@ impl<N: Real> World<N> {
         self.cworld.collision_objects()
     }
 
-    /// An iterator through all the contact events generated during the last execution of `self.step()`.
+    /// An iterator through all the contact events generated during the last
+    /// execution of `self.step()`.
     pub fn contact_events(&self) -> &ContactEvents {
         self.cworld.contact_events()
     }
 
-    /// An iterator through all the proximity events generated during the last execution of `self.step()`.
+    /// An iterator through all the proximity events generated during the last
+    /// execution of `self.step()`.
     pub fn proximity_events(&self) -> &ProximityEvents {
         self.cworld.proximity_events()
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<N: Real> Default for World<N> {
     fn default() -> Self {
         Self::new()
@@ -614,10 +748,14 @@ impl<N: Real> Default for World<N> {
 }
 
 struct BodyStatusCollisionFilter;
-impl<N: Real> BroadPhasePairFilter<N, ColliderData<N>> for BodyStatusCollisionFilter {
-    /// Activate an action for when two objects start or stop to be close to each other.
+impl<N: Real> BroadPhasePairFilter<N, ColliderData<N>>
+    for BodyStatusCollisionFilter
+{
+    /// Activate an action for when two objects start or stop to be close to
+    /// each other.
     fn is_pair_valid(&self, b1: &Collider<N>, b2: &Collider<N>) -> bool {
-        b1.data().body_status_dependent_ndofs() != 0 || b2.data().body_status_dependent_ndofs() != 0
+        b1.data().body_status_dependent_ndofs() != 0
+            || b2.data().body_status_dependent_ndofs() != 0
     }
 }
 

@@ -5,10 +5,12 @@ extern crate nphysics_testbed3d;
 
 use na::{Isometry3, Point3, Vector3};
 use ncollide3d::shape::{Ball, Plane, ShapeHandle};
-use nphysics3d::world::World;
-use nphysics3d::force_generator::ConstantAcceleration;
-use nphysics3d::object::{BodyHandle, Material};
-use nphysics3d::volumetric::Volumetric;
+use nphysics3d::{
+    force_generator::ConstantAcceleration,
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed3d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -19,11 +21,16 @@ fn main() {
     /*
      * World
      */
+    #[cfg(not(target_arch = "wasm32"))]
     let mut world = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world = World::new(|| 0.0);
 
     // We setup two force generators that will replace the gravity.
-    let mut up_gravity = ConstantAcceleration::new(Vector3::y() * 9.81, Vector3::zeros());
-    let mut down_gravity = ConstantAcceleration::new(Vector3::y() * -9.81, Vector3::zeros());
+    let mut up_gravity =
+        ConstantAcceleration::new(Vector3::y() * 9.81, Vector3::zeros());
+    let mut down_gravity =
+        ConstantAcceleration::new(Vector3::y() * -9.81, Vector3::zeros());
 
     /*
      * Planes
@@ -70,7 +77,8 @@ fn main() {
                  * Create the rigid body.
                  */
                 let pos = Isometry3::new(Vector3::new(x, y, z), na::zero());
-                let handle = world.add_rigid_body(pos, inertia, center_of_mass);
+                let handle =
+                    world.add_rigid_body(pos, inertia, center_of_mass);
 
                 /*
                  * Create the collider.

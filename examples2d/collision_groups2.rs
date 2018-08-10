@@ -4,11 +4,15 @@ extern crate nphysics2d;
 extern crate nphysics_testbed2d;
 
 use na::{Isometry2, Point2, Point3, Vector2};
-use ncollide2d::shape::{Cuboid, ShapeHandle};
-use ncollide2d::world::CollisionGroups;
-use nphysics2d::object::{BodyHandle, Material};
-use nphysics2d::volumetric::Volumetric;
-use nphysics2d::world::World;
+use ncollide2d::{
+    shape::{Cuboid, ShapeHandle},
+    world::CollisionGroups,
+};
+use nphysics2d::{
+    object::{BodyHandle, Material},
+    volumetric::Volumetric,
+    world::World,
+};
 use nphysics_testbed2d::Testbed;
 
 const COLLIDER_MARGIN: f32 = 0.01;
@@ -19,7 +23,11 @@ fn main() {
     /*
      * World
      */
-    let mut world = World::new();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut world: World<f32> = World::new();
+    #[cfg(target_arch = "wasm32")]
+    let mut world: World<f32> = World::new(|| 0.0);
+
     world.set_gravity(Vector2::new(0.0, -9.81));
 
     /*
@@ -99,7 +107,8 @@ fn main() {
     let centerx = shift * (num as f32) / 2.0;
     let centery = 2.5;
 
-    let geom = ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
+    let geom =
+        ShapeHandle::new(Cuboid::new(Vector2::repeat(rad - COLLIDER_MARGIN)));
     let inertia = geom.inertia(1.0);
     let center_of_mass = geom.center_of_mass();
 
@@ -112,7 +121,8 @@ fn main() {
              * Create the rigid body.
              */
             let pos = Isometry2::new(Vector2::new(x, y), na::zero());
-            let body_handle = world.add_rigid_body(pos, inertia, center_of_mass);
+            let body_handle =
+                world.add_rigid_body(pos, inertia, center_of_mass);
 
             /*
              * Create the collider.
@@ -130,12 +140,20 @@ fn main() {
                 world
                     .collision_world_mut()
                     .set_collision_groups(collider_handle, green_group);
-                testbed.set_body_color(&world, body_handle, Point3::new(0.0, 1.0, 0.0));
+                testbed.set_body_color(
+                    &world,
+                    body_handle,
+                    Point3::new(0.0, 1.0, 0.0),
+                );
             } else {
                 world
                     .collision_world_mut()
                     .set_collision_groups(collider_handle, blue_group);
-                testbed.set_body_color(&world, body_handle, Point3::new(0.0, 0.0, 1.0));
+                testbed.set_body_color(
+                    &world,
+                    body_handle,
+                    Point3::new(0.0, 0.0, 1.0),
+                );
             }
         }
     }

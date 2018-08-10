@@ -9,7 +9,8 @@ pub struct SolverCounters {
     pub ncontacts: usize,
     /// Time spent for the resolution of the constraints (force computation).
     pub velocity_resolution_time: Timer,
-    /// Time spent for the assembly of all the constraints into a linear complentarity problem.
+    /// Time spent for the assembly of all the constraints into a linear
+    /// complentarity problem.
     pub assembly_time: Timer,
     /// Time spent for the update of the velocity of the bodies.
     pub velocity_update_time: Timer,
@@ -19,14 +20,28 @@ pub struct SolverCounters {
 
 impl SolverCounters {
     /// Creates a new counter initialized to zero.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new() -> Self {
         SolverCounters {
-            nconstraints: 0,
-            ncontacts: 0,
-            assembly_time: Timer::new(),
+            nconstraints:             0,
+            ncontacts:                0,
+            assembly_time:            Timer::new(),
             velocity_resolution_time: Timer::new(),
-            velocity_update_time: Timer::new(),
+            velocity_update_time:     Timer::new(),
             position_resolution_time: Timer::new(),
+        }
+    }
+
+    /// Creates a new counter initialized to zero.
+    #[cfg(target_arch = "wasm32")]
+    pub fn new(time_in_sec: fn() -> f64) -> Self {
+        SolverCounters {
+            nconstraints:             0,
+            ncontacts:                0,
+            assembly_time:            Timer::new(time_in_sec),
+            velocity_resolution_time: Timer::new(time_in_sec),
+            velocity_update_time:     Timer::new(time_in_sec),
+            position_resolution_time: Timer::new(time_in_sec),
         }
     }
 }
